@@ -318,6 +318,17 @@ pub fn build(b: *std.Build) void {
             .flags = cc_flags,
         });
     }
+
+    const added_named_lazy_path_version = comptime std.SemanticVersion.parse("0.14.0-dev.1576+5d7fa5513") catch unreachable;
+
+    if (comptime @import("builtin").zig_version.order(added_named_lazy_path_version) != .lt) {
+        b.addNamedLazyPath("wayland-xml", upstream.path("protocol/wayland.xml"));
+        b.addNamedLazyPath("wayland.dtd", upstream.path("protocol/wayland.dtd"));
+    }
+
+    const protocol = b.addNamedWriteFiles("protocol");
+    _ = protocol.addCopyFile(upstream.path("protocol/wayland.xml"), "wayland.xml");
+    _ = protocol.addCopyFile(upstream.path("protocol/wayland.dtd"), "wayland.dtd");
 }
 
 fn createWaylandUtil(
