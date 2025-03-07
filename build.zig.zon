@@ -1,25 +1,25 @@
 .{
-    .name = "wayland",
+    .name = .wayland,
     .version = "1.23.1-1",
-    .minimum_zig_version = "0.13.0",
+    .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .wayland = .{
             .url = "git+https://gitlab.freedesktop.org/wayland/wayland.git?ref=1.23.1#a9fec8dd65977c57f4039ced34327204d9b9d779",
-            .hash = "1220b62de1974a154da15d285955bd4f6f77255ce6c74918e4a55a9f7f8206266afa",
+            .hash = "N-V-__8AAJC3GAC2LeGXShVNoV0oWVW9T293JVzmx0kY5KVa",
         },
         .libffi = .{
-            .url = "git+https://github.com/vezel-dev/libffi.git?ref=v3.4.6-6#2e2a0527a080149f2e15c6827e56a656fbb6b41b",
-            .hash = "1220870d4bcd70fe7dc9b65f23006f0c4d6ed0a08575d9835b3c4e0341c1ad2ec95f",
+            .url = "git+https://github.com/vezel-dev/libffi.git?ref=v3.4.7-1#cb0cd4f1544b9f7dc2351d038616b21682df4924",
+            .hash = "libffi-3.4.7-7_tEtBQXFwAl0hoF2HpJn6uk_NZ2-VOzaplKHEMzUeyA",
             .lazy = true,
         },
         .libexpat = .{
-            .url = "git+https://github.com/allyourcodebase/libexpat.git?ref=2.6.4#57aa500f8c9f6701044a5fd0ac5d730d36f800cd",
-            .hash = "12201c4d02fa2dea1702608ea93b440978b1b5f58dcbdf624cd6274f0e6121046281",
+            .url = "git+https://github.com/allyourcodebase/libexpat.git?ref=2.6.4-1#c1e507c65308ec05ec6e0e29b727ebf9557424b8",
+            .hash = "libexpat-2.6.4-1-y_akI-84AAB_XQ3OxV817T6JdBaQOY1wrXE9FAwCdfFh",
             .lazy = true,
         },
         .libxml2 = .{
-            .url = "git+https://github.com/allyourcodebase/libxml2.git?ref=2.13.5#febfc2172cac835421acdff37a6c430abf1c6b2e",
-            .hash = "12204f818f4fe7673633098a61c7f2ccab2b6ce002750d9b7fd2d12e0df78965e209",
+            .url = "git+https://github.com/allyourcodebase/libxml2.git?ref=2.13.5-1#d01929f24a28b0c0532e150118b0a64376d72d9e",
+            .hash = "libxml2-2.13.5-1-qHdjhg09AADUdInufACTIMlQfWH0cffCkefYl9Wkl2ci",
             .lazy = true,
         },
     },
@@ -30,4 +30,5 @@
         "LICENSE",
         "README.md",
     },
+    .fingerprint = 0xa8d655e6b011177, // Changing this has security and trust implications.
 }
