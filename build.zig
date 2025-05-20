@@ -22,21 +22,8 @@ pub fn build(b: *std.Build) void {
     const link_system_expat = b.systemIntegrationOption("expat", .{});
     const link_system_ffi = b.systemIntegrationOption("ffi", .{});
 
-    const cc_flags = blk: {
-        var cc_flags_list: std.ArrayListUnmanaged([]const u8) = .{};
-        cc_flags_list.appendSlice(b.allocator, &.{
-            "-std=c99",
-            "-Wno-unused-parameter",
-            "-Wstrict-prototypes",
-            "-Wmissing-prototypes",
-            "-fvisibility=hidden",
-        }) catch @panic("OOM");
-        switch (target.result.os.tag) {
-            .freebsd, .openbsd => {},
-            else => cc_flags_list.append(b.allocator, "-D_POSIX_C_SOURCE=200809L") catch @panic("OOM"),
-        }
-        break :blk cc_flags_list.items;
-    };
+    const cc_flags = getCCFlags(b, target);
+    const host_cc_flags = getCCFlags(b, b.graph.host);
 
     const wayland_version_header = b.addConfigHeader(.{
         .style = .{ .cmake = upstream.path("src/wayland-version.h.in") },
@@ -52,16 +39,15 @@ pub fn build(b: *std.Build) void {
 
     const wayland_scanner_args: CreateWaylandScannerArgs = .{
         .dtd_validation = dtd_validation,
-        .cc_flags = cc_flags,
         .wayland = upstream,
         .wayland_version_header = wayland_version_header,
     };
 
-    const wayland_scanner = createWaylandScanner(b, target, optimize, wayland_scanner_args);
+    const wayland_scanner = createWaylandScanner(b, target, optimize, wayland_scanner_args, cc_flags);
     wayland_scanner.root_module.linkLibrary(wayland_util);
     b.installArtifact(wayland_scanner);
 
-    const wayland_scanner_host = createWaylandScanner(b, b.graph.host, optimize, wayland_scanner_args);
+    const wayland_scanner_host = createWaylandScanner(b, b.graph.host, optimize, wayland_scanner_args, host_cc_flags);
     wayland_scanner_host.root_module.linkLibrary(wayland_util_host);
 
     if (link_system_expat) {
@@ -375,7 +361,6 @@ fn createWaylandUtil(
 
 const CreateWaylandScannerArgs = struct {
     dtd_validation: bool,
-    cc_flags: []const []const u8,
     wayland: *std.Build.Dependency,
     wayland_version_header: *std.Build.Step.ConfigHeader,
 };
@@ -385,6 +370,7 @@ fn createWaylandScanner(
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     args: CreateWaylandScannerArgs,
+    cc_flags: []const []const u8,
 ) *std.Build.Step.Compile {
     const wayland_scanner = b.addExecutable(.{
         .name = "wayland-scanner",
@@ -397,7 +383,7 @@ fn createWaylandScanner(
     wayland_scanner.root_module.addConfigHeader(args.wayland_version_header);
     wayland_scanner.root_module.addCSourceFile(.{
         .file = args.wayland.path("src/scanner.c"),
-        .flags = args.cc_flags,
+        .flags = cc_flags,
     });
     wayland_scanner.root_module.addIncludePath(args.wayland.path(""));
     wayland_scanner.root_module.addIncludePath(args.wayland.path("protocol"));
@@ -435,6 +421,22 @@ fn createWaylandScanner(
     }
 
     return wayland_scanner;
+}
+
+fn getCCFlags(b: *std.Build, target: std.Build.ResolvedTarget) []const []const u8 {
+    var cc_flags_list: std.ArrayListUnmanaged([]const u8) = .{};
+    cc_flags_list.appendSlice(b.allocator, &.{
+        "-std=c99",
+        "-Wno-unused-parameter",
+        "-Wstrict-prototypes",
+        "-Wmissing-prototypes",
+        "-fvisibility=hidden",
+    }) catch @panic("OOM");
+    switch (target.result.os.tag) {
+        .freebsd, .openbsd => {},
+        else => cc_flags_list.append(b.allocator, "-D_POSIX_C_SOURCE=200809L") catch @panic("OOM"),
+    }
+    return cc_flags_list.items;
 }
 
 comptime {
