@@ -71,19 +71,38 @@ pub fn build(b: *std.Build) void {
     const wayland_header = b.addConfigHeader(.{}, .{
         .PACKAGE = "wayland",
         .PACKAGE_VERSION = b.fmt("{}", .{version}),
-        .HAVE_SYS_PRCTL_H = true, // sys/prctl.h
-        .HAVE_SYS_PROCCTL_H = null, // sys/procctl.h
-        .HAVE_SYS_UCRED_H = if (target.result.os.tag == .macos) true else null, // sys/ucred.h
+        .HAVE_SYS_PRCTL_H = target.result.os.tag == .linux,
+        .HAVE_SYS_PROCCTL_H = target.result.os.isAtLeast(.freebsd, .{ .major = 10, .minor = 0, .patch = 0 }),
+        .HAVE_SYS_UCRED_H = target.result.os.tag.isBSD(),
         .HAVE_ACCEPT4 = true,
-        .HAVE_MKOSTEMP = true,
+        // libffi also has `HAVE_MKOSTEMP` but doesn't check the glibc version
+        .HAVE_MKOSTEMP = if (target.result.isMuslLibC())
+            true
+        else if (target.result.isGnuLibC())
+            target.result.os.version_range.linux.glibc.order(.{ .major = 2, .minor = 7, .patch = 0 }) != .lt
+        else
+            unreachable,
         .HAVE_POSIX_FALLOCATE = true,
-        .HAVE_PRCTL = true,
-        .HAVE_MEMFD_CREATE = true,
-        .HAVE_MREMAP = true,
+        .HAVE_PRCTL = target.result.os.tag == .linux,
+        .HAVE_MEMFD_CREATE = switch (target.result.os.tag) {
+            .linux => if (target.result.isMuslLibC())
+                true
+            else if (target.result.isGnuLibC())
+                target.result.os.version_range.linux.glibc.order(.{ .major = 2, .minor = 27, .patch = 0 }) != .lt
+            else
+                unreachable,
+            .freebsd => target.result.os.isAtLeast(.freebsd, .{ .major = 13, .minor = 0, .patch = 0 }) orelse false,
+            else => false,
+        },
+        .HAVE_MREMAP = target.result.os.tag == .linux or target.result.os.tag == .freebsd,
         .HAVE_STRNDUP = true,
-        .HAVE_BROKEN_MSG_CMSG_CLOEXEC = false, // // TODO check freebsd version
+        .HAVE_BROKEN_MSG_CMSG_CLOEXEC = false, // // TODO __FreeBSD_version < 1300502 || (__FreeBSD_version >= 1400000 && __FreeBSD_version < 1400006)
         .HAVE_XUCRED_CR_PID = false, // TODO
     });
+
+    for (wayland_header.values.values()) |*entry| {
+        if (entry.* == .boolean and !entry.boolean) entry.* = .undef;
+    }
 
     const wayland_private = blk: {
         const write_files = b.addWriteFiles();
