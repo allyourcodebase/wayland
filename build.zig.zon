@@ -8,8 +8,8 @@
             .hash = "N-V-__8AAJC3GAC2LeGXShVNoV0oWVW9T293JVzmx0kY5KVa",
         },
         .libffi = .{
-            .url = "git+https://github.com/vezel-dev/libffi.git?ref=v3.4.8-2#0f6f1d1b201771e7784440b2ca1faf215c6db6d1",
-            .hash = "libffi-3.4.8-7_tEtDcoFwCpZb5rosPGiu-AOJbA2KwTrM4fNxZJlNxg",
+            .url = "git+https://codeberg.org/vezel/libffi.git?ref=v3.5.1-1#d743d907665b1cd74ce9eedd9728c2894d99b91f",
+            .hash = "libffi-3.5.1-7_tEtKcuFwBDEnKj0nXtPSso89t0I4cBLIdmU6OM-zsj",
             .lazy = true,
         },
         .libexpat = .{
