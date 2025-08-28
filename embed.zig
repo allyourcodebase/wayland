@@ -28,18 +28,18 @@
 const std = @import("std");
 
 pub fn main() !void {
-    var general_purpose_allocator: std.heap.GeneralPurposeAllocator(.{}) = .{};
-    defer _ = general_purpose_allocator.deinit();
-    const gpa = general_purpose_allocator.allocator();
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    defer _ = debug_allocator.deinit();
+    const gpa = debug_allocator.allocator();
 
     const args = try std.process.argsAlloc(gpa);
     defer std.process.argsFree(gpa, args);
 
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
+    var buffer: [4096]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&buffer);
 
     if (args.len != 3) {
-        try stderr.print("usage: {s} <filename> <ident>\n", .{args[0]});
+        std.debug.print("usage: {s} <filename> <ident>\n", .{args[0]});
         std.process.exit(1);
     }
     const filename = args[1];
@@ -48,9 +48,10 @@ pub fn main() !void {
     const buf = try std.fs.cwd().readFileAlloc(gpa, filename, std.math.maxInt(u32));
     defer gpa.free(buf);
 
-    try stdout.print("static const char {s}[] = {{\n\t", .{ident});
+    try stdout_writer.interface.print("static const char {s}[] = {{\n\t", .{ident});
     for (buf) |c| {
-        try stdout.print("0x{x:0>2}, ", .{c});
+        try stdout_writer.interface.print("0x{x:0>2}, ", .{c});
     }
-    try stdout.print("\n}};\n", .{});
+    try stdout_writer.interface.writeAll("\n};\n");
+    try stdout_writer.interface.flush();
 }

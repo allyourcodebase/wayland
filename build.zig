@@ -31,7 +31,7 @@ pub fn build(b: *std.Build) void {
         .WAYLAND_VERSION_MAJOR = @as(i64, @intCast(version.major)),
         .WAYLAND_VERSION_MINOR = @as(i64, @intCast(version.minor)),
         .WAYLAND_VERSION_MICRO = @as(i64, @intCast(version.patch)),
-        .WAYLAND_VERSION = b.fmt("{}", .{version}),
+        .WAYLAND_VERSION = b.fmt("{f}", .{version}),
     });
 
     const wayland_util = createWaylandUtil(b, target, optimize, upstream, cc_flags);
@@ -70,7 +70,7 @@ pub fn build(b: *std.Build) void {
 
     const wayland_header = b.addConfigHeader(.{}, .{
         .PACKAGE = "wayland",
-        .PACKAGE_VERSION = b.fmt("{}", .{version}),
+        .PACKAGE_VERSION = b.fmt("{f}", .{version}),
         .HAVE_SYS_PRCTL_H = target.result.os.tag == .linux,
         .HAVE_SYS_PROCCTL_H = target.result.os.isAtLeast(.freebsd, .{ .major = 10, .minor = 0, .patch = 0 }),
         .HAVE_SYS_UCRED_H = target.result.os.tag.isBSD(),
