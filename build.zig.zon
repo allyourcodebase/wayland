@@ -22,6 +22,11 @@
             .hash = "libxml2-2.15.1-2-qHdjhmNMAAAiZOWqVridicq2oMf5NHv0n9W41bz9FtMM",
             .lazy = true,
         },
+        .@"epoll-shim" = .{
+            .url = "git+https://github.com/jiixyj/epoll-shim.git#18159584bb3d17e601b9315a7398ace018251bdc",
+            .hash = "N-V-__8AAJHtBwDe4gR5ofaikfFsHj0vPE-uTQSAkqY2uRv_",
+            .lazy = true,
+        },
     },
     .paths = .{
         "build.zig",
