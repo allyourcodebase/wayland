@@ -106,8 +106,8 @@ pub fn build(b: *std.Build) void {
 
     const wayland_private = blk: {
         const write_files = b.addWriteFiles();
-        _ = write_files.addCopyFile(wayland_header.getOutput(), "config.h");
-        const wayland_header2 = write_files.addCopyFile(wayland_header.getOutput(), "config/config.h");
+        _ = write_files.addCopyFile(wayland_header.getOutputFile(), "config.h");
+        const wayland_header2 = write_files.addCopyFile(wayland_header.getOutputFile(), "config/config.h");
 
         const wayland_private = b.addLibrary(.{
             .linkage = .static,
