@@ -32,6 +32,7 @@
         "build.zig",
         "build.zig.zon",
         "embed.zig",
+        "epoll_shim_export.h",
         "LICENSE",
         "README.md",
     },
