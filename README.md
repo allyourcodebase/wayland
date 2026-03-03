@@ -28,7 +28,7 @@ const wayland_cursor = wayland.artifact("wayland-cursor");
 
 // Makes sure we get `wayland-scanner` for the host platform even when cross-compiling
 const wayland_host = b.dependency("wayland", .{
-    .target = b.host,
+    .target = b.graph.host,
     .optimize = std.builtin.OptimizeMode.Debug,
 });
 const wayland_scanner = wayland_host.artifact("wayland-scanner");
