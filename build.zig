@@ -14,13 +14,15 @@ pub fn build(b: *std.Build) void {
     const dtd_validation = b.option(bool, "dtd-validation", "Validate the protocol DTD") orelse true;
     const icon_directory = b.option([]const u8, "icon-directory", "Location used to look for cursors (defaults to ${datadir}/icons if unset)");
 
+    const link_system_expat = b.systemIntegrationOption("expat", .{});
+    const link_system_ffi = b.systemIntegrationOption("ffi", .{});
+    const link_system_epoll_shim = b.systemIntegrationOption("epoll-shim", .{});
+
     const need_epoll_shim = switch (target.result.os.tag) {
         .freebsd, .openbsd => true,
         else => false,
     };
-
-    const link_system_expat = b.systemIntegrationOption("expat", .{});
-    const link_system_ffi = b.systemIntegrationOption("ffi", .{});
+    const epoll_shim = if (need_epoll_shim and !link_system_epoll_shim) createEpollShim(b, target, optimize) else null;
 
     const cc_flags = getCCFlags(b, target);
     const host_cc_flags = getCCFlags(b, b.graph.host);
@@ -72,26 +74,21 @@ pub fn build(b: *std.Build) void {
         .PACKAGE = "wayland",
         .PACKAGE_VERSION = b.fmt("{f}", .{version}),
         .HAVE_SYS_PRCTL_H = target.result.os.tag == .linux,
-        .HAVE_SYS_PROCCTL_H = target.result.os.isAtLeast(.freebsd, .{ .major = 10, .minor = 0, .patch = 0 }),
+        .HAVE_SYS_PROCCTL_H = target.result.os.isAtLeast(.freebsd, .{ .major = 10, .minor = 0, .patch = 0 }) orelse false,
         .HAVE_SYS_UCRED_H = target.result.os.tag.isBSD(),
         .HAVE_ACCEPT4 = true,
-        // libffi also has `HAVE_MKOSTEMP` but doesn't check the glibc version
-        .HAVE_MKOSTEMP = if (target.result.isMuslLibC())
-            true
-        else if (target.result.isGnuLibC())
-            target.result.os.version_range.linux.glibc.order(.{ .major = 2, .minor = 7, .patch = 0 }) != .lt
-        else
-            unreachable,
+        .HAVE_MKOSTEMP = switch (target.result.os.tag) {
+            .linux => target.result.isMuslLibC() or (target.result.isGnuLibC() and target.result.os.version_range.linux.glibc.order(.{ .major = 2, .minor = 7, .patch = 0 }) != .lt),
+            .freebsd => target.result.os.isAtLeast(.freebsd, .{ .major = 10, .minor = 0, .patch = 0 }) orelse false,
+            else => false,
+        },
         .HAVE_POSIX_FALLOCATE = true,
         .HAVE_PRCTL = target.result.os.tag == .linux,
+        // libffi also has `HAVE_MEMFD_CREATE` but doesn't check the glibc version
         .HAVE_MEMFD_CREATE = switch (target.result.os.tag) {
-            .linux => if (target.result.isMuslLibC())
-                true
-            else if (target.result.isGnuLibC())
-                target.result.os.version_range.linux.glibc.order(.{ .major = 2, .minor = 27, .patch = 0 }) != .lt
-            else
-                unreachable,
+            .linux => target.result.isMuslLibC() or (target.result.isGnuLibC() and target.result.os.version_range.linux.glibc.order(.{ .major = 2, .minor = 7, .patch = 0 }) != .lt),
             .freebsd => target.result.os.isAtLeast(.freebsd, .{ .major = 13, .minor = 0, .patch = 0 }) orelse false,
+            .netbsd => target.result.os.version_range.semver.isAtLeast(.{ .major = 11, .minor = 0, .patch = 0 }) orelse false,
             else => false,
         },
         .HAVE_MREMAP = target.result.os.tag == .linux or target.result.os.tag == .freebsd,
@@ -128,7 +125,13 @@ pub fn build(b: *std.Build) void {
             .root = upstream.path("src"),
             .flags = cc_flags,
         });
-        if (need_epoll_shim) wayland_private.root_module.linkSystemLibrary("epoll-shim", .{});
+        if (need_epoll_shim) {
+            if (link_system_epoll_shim) {
+                wayland_private.root_module.linkSystemLibrary("epoll-shim", .{});
+            } else {
+                if (epoll_shim) |compile| wayland_private.root_module.linkLibrary(compile);
+            }
+        }
         wayland_private.root_module.linkSystemLibrary("rt", .{});
         if (link_system_ffi) {
             wayland_private.root_module.linkSystemLibrary("ffi", .{});
@@ -224,7 +227,13 @@ pub fn build(b: *std.Build) void {
             .root = upstream.path("src"),
             .flags = cc_flags,
         });
-        if (need_epoll_shim) wayland_server.root_module.linkSystemLibrary("epoll-shim", .{});
+        if (need_epoll_shim) {
+            if (link_system_epoll_shim) {
+                wayland_server.root_module.linkSystemLibrary("epoll-shim", .{});
+            } else {
+                if (epoll_shim) |compile| wayland_server.root_module.linkLibrary(compile);
+            }
+        }
         wayland_server.root_module.linkSystemLibrary("rt", .{});
         if (link_system_ffi) {
             wayland_server.root_module.linkSystemLibrary("ffi", .{});
@@ -274,7 +283,13 @@ pub fn build(b: *std.Build) void {
             .flags = cc_flags,
         });
 
-        if (need_epoll_shim) wayland_client.root_module.linkSystemLibrary("epoll-shim", .{});
+        if (need_epoll_shim) {
+            if (link_system_epoll_shim) {
+                wayland_client.root_module.linkSystemLibrary("epoll-shim", .{});
+            } else {
+                if (epoll_shim) |compile| wayland_client.root_module.linkLibrary(compile);
+            }
+        }
         wayland_client.root_module.linkSystemLibrary("rt", .{});
         if (link_system_ffi) {
             wayland_client.root_module.linkSystemLibrary("ffi", .{});
@@ -456,6 +471,100 @@ fn getCCFlags(b: *std.Build, target: std.Build.ResolvedTarget) []const []const u
         else => cc_flags_list.append(b.allocator, "-D_POSIX_C_SOURCE=200809L") catch @panic("OOM"),
     }
     return cc_flags_list.items;
+}
+
+fn createEpollShim(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) ?*std.Build.Step.Compile {
+    const upstream = b.lazyDependency("epoll-shim", .{}) orelse return null;
+
+    const have_eventfd = switch (target.result.os.tag) {
+        .freebsd => target.result.os.isAtLeast(.freebsd, .{ .major = 13, .minor = 0, .patch = 0 }) orelse false,
+        .netbsd => target.result.os.isAtLeast(.netbsd, .{ .major = 10, .minor = 0, .patch = 0 }) orelse false,
+        .openbsd => false,
+        else => unreachable,
+    };
+    const have_timerfd = switch (target.result.os.tag) {
+        .freebsd => target.result.os.isAtLeast(.freebsd, .{ .major = 12, .minor = 0, .patch = 0 }) orelse false,
+        .netbsd => target.result.os.isAtLeast(.netbsd, .{ .major = 10, .minor = 0, .patch = 0 }) orelse false,
+        .openbsd => false,
+        else => unreachable,
+    };
+    const have_errno_t = switch (target.result.os.tag) {
+        .netbsd => false,
+        .freebsd, .openbsd => true,
+        else => unreachable,
+    };
+
+    const flags: []const []const u8 = &.{
+        "-fvisibility=hidden",
+        "-std=gnu11",
+    };
+
+    const epoll_shim = b.addLibrary(.{
+        .name = "epoll-shim",
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+
+    for ([_][]const u8{
+        "epoll-shim/detail/common.h",
+        "epoll-shim/detail/poll.h",
+        "epoll-shim/detail/read.h",
+        "epoll-shim/detail/write.h",
+        "sys/epoll.h",
+        "sys/signalfd.h",
+    }) |path| {
+        const config_header = b.addConfigHeader(.{
+            .include_path = path,
+            .style = .{ .cmake = upstream.path("include").path(b, path) },
+        }, .{
+            .POLLRDHUP_VALUE = @as(i64, if (target.result.isFreeBSDLibC()) 0x4000 else 0x2000),
+        });
+        epoll_shim.installConfigHeader(config_header);
+        epoll_shim.root_module.addConfigHeader(config_header);
+    }
+    epoll_shim.root_module.linkSystemLibrary("pthread", .{});
+    epoll_shim.root_module.linkSystemLibrary("rt", .{});
+    epoll_shim.root_module.addCMacro("EPOLL_SHIM_DISABLE_WRAPPER_MACROS", "");
+    epoll_shim.root_module.addIncludePath(b.path(""));
+    epoll_shim.root_module.addIncludePath(upstream.path("external/queue-macros/include"));
+    epoll_shim.root_module.addIncludePath(upstream.path("external/tree-macros/include/sys"));
+    epoll_shim.root_module.addCSourceFiles(.{
+        .root = upstream.path("src"),
+        .files = &.{
+            "epoll_shim_ctx.c",
+            "epoll.c",
+            "epollfd_ctx.c",
+            "kqueue_event.c",
+            "signalfd.c",
+            "signalfd_ctx.c",
+            "timespec_util.c",
+            "rwlock.c",
+            "wrap.c",
+        },
+        .flags = flags,
+    });
+    if (!have_eventfd) {
+        epoll_shim.installHeader(upstream.path("include/sys/eventfd.h"), "sys/eventfd.h");
+        epoll_shim.root_module.addCSourceFile(.{ .file = upstream.path("src/eventfd.c"), .flags = flags });
+        epoll_shim.root_module.addCSourceFile(.{ .file = upstream.path("src/eventfd_ctx.c"), .flags = flags });
+    }
+    if (!have_timerfd) {
+        epoll_shim.installHeader(upstream.path("include/sys/timerfd.h"), "sys/timerfd.h");
+        epoll_shim.root_module.addCSourceFile(.{ .file = upstream.path("src/timerfd.c"), .flags = flags });
+        epoll_shim.root_module.addCSourceFile(.{ .file = upstream.path("src/timerfd_ctx.c"), .flags = flags });
+    } else {
+        epoll_shim.root_module.addCMacro("HAVE_TIMERFD", "");
+    }
+    if (!have_errno_t) epoll_shim.root_module.addCMacro("errno_t", "int");
+
+    return epoll_shim;
 }
 
 comptime {
