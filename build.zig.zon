@@ -1,7 +1,7 @@
 .{
     .name = .wayland,
     .version = "1.24.0-2",
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .wayland = .{
             .url = "git+https://gitlab.freedesktop.org/wayland/wayland.git?ref=1.24#736d12ac67c20c60dc406dc49bb06be878501f86",
