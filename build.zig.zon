@@ -1,6 +1,6 @@
 .{
     .name = .wayland,
-    .version = "1.24.0-3",
+    .version = "1.24.0-4",
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .wayland = .{
