@@ -27,16 +27,13 @@
 
 const std = @import("std");
 
-pub fn main() !void {
-    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-    defer _ = debug_allocator.deinit();
-    const gpa = debug_allocator.allocator();
-
-    const args = try std.process.argsAlloc(gpa);
-    defer std.process.argsFree(gpa, args);
+pub fn main(init: std.process.Init) !void {
+    const gpa = init.gpa;
+    const io = init.io;
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
 
     var buffer: [4096]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&buffer);
+    var stdout_writer = std.Io.File.stdout().writer(io, &buffer);
 
     if (args.len != 3) {
         std.debug.print("usage: {s} <filename> <ident>\n", .{args[0]});
@@ -45,7 +42,7 @@ pub fn main() !void {
     const filename = args[1];
     const ident = args[2];
 
-    const buf = try std.fs.cwd().readFileAlloc(gpa, filename, std.math.maxInt(u32));
+    const buf = try std.Io.Dir.cwd().readFileAlloc(io, filename, gpa, .limited(std.math.maxInt(u32)));
     defer gpa.free(buf);
 
     try stdout_writer.interface.print("static const char {s}[] = {{\n\t", .{ident});

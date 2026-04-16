@@ -435,9 +435,7 @@ fn createWaylandScanner(
         run_embed.addFileArg(args.wayland.path("protocol/wayland.dtd"));
         run_embed.addArg("wayland_dtd");
 
-        const write_files = b.addWriteFiles();
-        const wayland_dtd = write_files.addCopyFile(run_embed.captureStdOut(), "wayland.dtd.h");
-        wayland_scanner.root_module.addIncludePath(wayland_dtd.dirname());
+        wayland_scanner.root_module.addIncludePath(run_embed.captureStdOut(.{ .basename = "wayland.dtd.h" }).dirname());
 
         const link_system_libxml = b.systemIntegrationOption("libxml2", .{});
         if (link_system_libxml) {
@@ -458,7 +456,7 @@ fn createWaylandScanner(
 }
 
 fn getCCFlags(b: *std.Build, target: std.Build.ResolvedTarget) []const []const u8 {
-    var cc_flags_list: std.ArrayListUnmanaged([]const u8) = .{};
+    var cc_flags_list: std.ArrayList([]const u8) = .empty;
     cc_flags_list.appendSlice(b.allocator, &.{
         "-std=c99",
         "-Wno-unused-parameter",

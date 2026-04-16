@@ -1,20 +1,20 @@
 .{
     .name = .wayland,
     .version = "1.24.0-3",
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .wayland = .{
             .url = "git+https://gitlab.freedesktop.org/wayland/wayland.git?ref=1.24#736d12ac67c20c60dc406dc49bb06be878501f86",
             .hash = "N-V-__8AAGoeGQBEn6KguTJUXrCE0tIRrrXfQX7hYHoKCJwZ",
         },
         .libffi = .{
-            .url = "git+https://codeberg.org/vezel/libffi.git?ref=v3.5.2-3#e972331ede2dc7ca107b6c3d3998c3b66bcab4db",
-            .hash = "libffi-3.5.2-7_tEtCY7FwBjSWOed_hvKoIb_otUeege34q9FpLH_03N",
+            .url = "git+https://codeberg.org/vezel/libffi.git#74386f41b576e6e33253f9c46ea781764b84f536",
+            .hash = "libffi-3.5.2-7_tEtAQ6FwD6zfnc_i2bMJ3JgNr8YkgrBa1A8TWL39GC",
             .lazy = true,
         },
         .libexpat = .{
-            .url = "git+https://github.com/allyourcodebase/libexpat.git?ref=2.7.1-2#d0bb4a56bff357fb478988ade0f94a426490c4d8",
-            .hash = "libexpat-2.7.1-2-y_akI-47AAB-pppMdnxv9vkgNyerxr4IyfmHdz3aMtUm",
+            .url = "git+https://github.com/allyourcodebase/libexpat.git?ref=2.7.1-3#662b7d1cb5f347598d4619d125be317cc2c52b62",
+            .hash = "libexpat-2.7.1-3-y_akI_s7AABtuMADtwTTJGOxx8iY5ZC9T8EON6cjvbNw",
             .lazy = true,
         },
         .libxml2 = .{
