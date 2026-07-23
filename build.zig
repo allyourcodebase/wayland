@@ -221,6 +221,7 @@ pub fn build(b: *std.Build) void {
         });
         wayland_server.root_module.addCSourceFiles(.{
             .files = &.{
+                "wayland-server.c",
                 "wayland-shm.c",
                 "event-loop.c",
             },
