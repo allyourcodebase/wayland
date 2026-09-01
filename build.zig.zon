@@ -1,11 +1,11 @@
 .{
     .name = .wayland,
-    .version = "1.24.0-4",
+    .version = "1.26.0",
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .wayland = .{
-            .url = "git+https://gitlab.freedesktop.org/wayland/wayland.git?ref=1.24#736d12ac67c20c60dc406dc49bb06be878501f86",
-            .hash = "N-V-__8AAGoeGQBEn6KguTJUXrCE0tIRrrXfQX7hYHoKCJwZ",
+            .url = "git+https://gitlab.freedesktop.org/wayland/wayland.git?ref=1.26.0#87cc8a8728a923fc57938faa81ba0e74f34ecdc7",
+            .hash = "N-V-__8AAA46JQABKU7sa-6xGUAN44uFsYSUS_w79UVuu7qo",
         },
         .libffi = .{
             .url = "git+https://github.com/allyourcodebase/libffi.git#29f3c29dd59402dd2112db8252beb57c3966df2d",
