@@ -26,5 +26,7 @@ jobs:
         run: zig build --summary all
 
       - name: Build for FreeBSD
-        run: |
-          zig build -Dtarget=native-freebsd --summary all
+        run: zig build -Dtarget=native-freebsd --summary all
+
+      - name: Build for NetBSD
+        run: zig build -Dtarget=native-netbsd --summary all

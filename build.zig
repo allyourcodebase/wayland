@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
     const link_system_epoll_shim = b.systemIntegrationOption("epoll-shim", .{});
 
     const need_epoll_shim = switch (target.result.os.tag) {
-        .freebsd, .openbsd => true,
+        .freebsd, .netbsd, .openbsd => true,
         else => false,
     };
     const epoll_shim = if (need_epoll_shim and !link_system_epoll_shim) createEpollShim(b, target, optimize) else null;
@@ -74,27 +74,33 @@ pub fn build(b: *std.Build) void {
         .PACKAGE = "wayland",
         .PACKAGE_VERSION = b.fmt("{f}", .{version}),
         .HAVE_SYS_PRCTL_H = target.result.os.tag == .linux,
-        .HAVE_SYS_PROCCTL_H = target.result.os.isAtLeast(.freebsd, .{ .major = 10, .minor = 0, .patch = 0 }) orelse false,
+        .HAVE_SYS_PROCCTL_H = target.result.os.isAtLeast(.freebsd, .{ .major = 10, .minor = 0, .patch = 0 }) orelse false, // TODO dragonfly
         .HAVE_SYS_UCRED_H = target.result.os.tag.isBSD(),
         .HAVE_ACCEPT4 = true,
         .HAVE_MKOSTEMP = switch (target.result.os.tag) {
             .linux => target.result.isMuslLibC() or (target.result.isGnuLibC() and target.result.os.version_range.linux.glibc.order(.{ .major = 2, .minor = 7, .patch = 0 }) != .lt),
             .freebsd => target.result.os.isAtLeast(.freebsd, .{ .major = 10, .minor = 0, .patch = 0 }) orelse false,
+            .dragonfly => target.result.os.isAtLeast(.dragonfly, .{ .major = 4, .minor = 6, .patch = 0 }) orelse false,
+            .openbsd => target.result.os.isAtLeast(.openbsd, .{ .major = 5, .minor = 7, .patch = 0 }) orelse false,
             else => false,
         },
-        .HAVE_POSIX_FALLOCATE = true,
+        .HAVE_POSIX_FALLOCATE = switch (target.result.os.tag) {
+            .netbsd => false, // https://github.com/NetBSD/pkgsrc/blob/trunk/devel/wayland/patches/patch-meson.build
+            .openbsd => false,
+            else => true,
+        },
         .HAVE_PRCTL = target.result.os.tag == .linux,
         // libffi also has `HAVE_MEMFD_CREATE` but doesn't check the glibc version
         .HAVE_MEMFD_CREATE = switch (target.result.os.tag) {
             .linux => target.result.isMuslLibC() or (target.result.isGnuLibC() and target.result.os.version_range.linux.glibc.order(.{ .major = 2, .minor = 7, .patch = 0 }) != .lt),
             .freebsd => target.result.os.isAtLeast(.freebsd, .{ .major = 13, .minor = 0, .patch = 0 }) orelse false,
-            .netbsd => target.result.os.version_range.semver.isAtLeast(.{ .major = 11, .minor = 0, .patch = 0 }) orelse false,
+            .netbsd => false, // https://github.com/NetBSD/pkgsrc/blob/trunk/devel/wayland/patches/patch-meson.build
             else => false,
         },
         .HAVE_MREMAP = target.result.os.tag == .linux or target.result.os.tag == .freebsd,
         .HAVE_STRNDUP = true,
-        .HAVE_BROKEN_MSG_CMSG_CLOEXEC = false, // // TODO __FreeBSD_version < 1300502 || (__FreeBSD_version >= 1400000 && __FreeBSD_version < 1400006)
-        .HAVE_XUCRED_CR_PID = false, // TODO
+        .HAVE_BROKEN_MSG_CMSG_CLOEXEC = 0, // only applies to FreeBSD version from 2015 to 2021
+        .HAVE_XUCRED_CR_PID = 0, // TODO
     });
 
     for (wayland_header.values.values()) |*entry| {
@@ -132,7 +138,6 @@ pub fn build(b: *std.Build) void {
                 if (epoll_shim) |compile| wayland_private.root_module.linkLibrary(compile);
             }
         }
-        wayland_private.root_module.linkSystemLibrary("rt", .{});
         if (link_system_ffi) {
             wayland_private.root_module.linkSystemLibrary("ffi", .{});
         } else if (b.lazyDependency("libffi", .{
@@ -235,7 +240,6 @@ pub fn build(b: *std.Build) void {
                 if (epoll_shim) |compile| wayland_server.root_module.linkLibrary(compile);
             }
         }
-        wayland_server.root_module.linkSystemLibrary("rt", .{});
         if (link_system_ffi) {
             wayland_server.root_module.linkSystemLibrary("ffi", .{});
         } else if (b.lazyDependency("libffi", .{
@@ -291,7 +295,6 @@ pub fn build(b: *std.Build) void {
                 if (epoll_shim) |compile| wayland_client.root_module.linkLibrary(compile);
             }
         }
-        wayland_client.root_module.linkSystemLibrary("rt", .{});
         if (link_system_ffi) {
             wayland_client.root_module.linkSystemLibrary("ffi", .{});
         } else if (b.lazyDependency("libffi", .{
@@ -469,6 +472,9 @@ fn getCCFlags(b: *std.Build, target: std.Build.ResolvedTarget) []const []const u
         .freebsd, .openbsd => {},
         else => cc_flags_list.append(b.allocator, "-D_POSIX_C_SOURCE=200809L") catch @panic("OOM"),
     }
+    if (target.result.os.tag == .netbsd) {
+        cc_flags_list.append(b.allocator, "-D_NETBSD_SOURCE") catch @panic("OOM");
+    }
     return cc_flags_list.items;
 }
 
@@ -482,18 +488,25 @@ fn createEpollShim(
     const have_eventfd = switch (target.result.os.tag) {
         .freebsd => target.result.os.isAtLeast(.freebsd, .{ .major = 13, .minor = 0, .patch = 0 }) orelse false,
         .netbsd => target.result.os.isAtLeast(.netbsd, .{ .major = 10, .minor = 0, .patch = 0 }) orelse false,
-        .openbsd => false,
+        .dragonfly, .openbsd => false,
         else => unreachable,
     };
     const have_timerfd = switch (target.result.os.tag) {
         .freebsd => target.result.os.isAtLeast(.freebsd, .{ .major = 12, .minor = 0, .patch = 0 }) orelse false,
         .netbsd => target.result.os.isAtLeast(.netbsd, .{ .major = 10, .minor = 0, .patch = 0 }) orelse false,
         .openbsd => false,
+        .dragonfly => @panic("TODO"),
         else => unreachable,
     };
     const have_errno_t = switch (target.result.os.tag) {
-        .netbsd => false,
-        .freebsd, .openbsd => true,
+        .dragonfly, .netbsd, .openbsd => false,
+        .freebsd => true,
+        else => unreachable,
+    };
+    // Whether `signal.h` defines `sigandset`, `sigorset` and `sigisemptyset`
+    const have_sig_set_ops = switch (target.result.os.tag) {
+        .freebsd => true,
+        .dragonfly, .netbsd, .openbsd => false,
         else => unreachable,
     };
 
@@ -510,6 +523,9 @@ fn createEpollShim(
             .link_libc = true,
         }),
     });
+
+    var sources: std.ArrayList([]const u8) = .empty;
+    var compat_sources: std.ArrayList([]const u8) = .empty;
 
     for ([_][]const u8{
         "epoll-shim/detail/common.h",
@@ -529,39 +545,73 @@ fn createEpollShim(
         epoll_shim.root_module.addConfigHeader(config_header);
     }
     epoll_shim.root_module.linkSystemLibrary("pthread", .{});
-    epoll_shim.root_module.linkSystemLibrary("rt", .{});
     epoll_shim.root_module.addCMacro("EPOLL_SHIM_DISABLE_WRAPPER_MACROS", "");
     epoll_shim.root_module.addIncludePath(b.path(""));
+    epoll_shim.root_module.addIncludePath(upstream.path("include"));
     epoll_shim.root_module.addIncludePath(upstream.path("external/queue-macros/include"));
     epoll_shim.root_module.addIncludePath(upstream.path("external/tree-macros/include/sys"));
-    epoll_shim.root_module.addCSourceFiles(.{
-        .root = upstream.path("src"),
-        .files = &.{
-            "epoll_shim_ctx.c",
-            "epoll.c",
-            "epollfd_ctx.c",
-            "kqueue_event.c",
-            "signalfd.c",
-            "signalfd_ctx.c",
-            "timespec_util.c",
-            "rwlock.c",
-            "wrap.c",
-        },
-        .flags = flags,
-    });
+    sources.append(b.allocator, "epoll_shim_ctx.c") catch @panic("OOM");
+    sources.append(b.allocator, "epoll.c") catch @panic("OOM");
+    sources.append(b.allocator, "epollfd_ctx.c") catch @panic("OOM");
+    sources.append(b.allocator, "kqueue_event.c") catch @panic("OOM");
+    sources.append(b.allocator, "signalfd.c") catch @panic("OOM");
+    sources.append(b.allocator, "signalfd_ctx.c") catch @panic("OOM");
+    sources.append(b.allocator, "timespec_util.c") catch @panic("OOM");
+    sources.append(b.allocator, "rwlock.c") catch @panic("OOM");
+    sources.append(b.allocator, "wrap.c") catch @panic("OOM");
     if (!have_eventfd) {
         epoll_shim.installHeader(upstream.path("include/sys/eventfd.h"), "sys/eventfd.h");
-        epoll_shim.root_module.addCSourceFile(.{ .file = upstream.path("src/eventfd.c"), .flags = flags });
-        epoll_shim.root_module.addCSourceFile(.{ .file = upstream.path("src/eventfd_ctx.c"), .flags = flags });
+        sources.append(b.allocator, "eventfd.c") catch @panic("OOM");
+        sources.append(b.allocator, "eventfd_ctx.c") catch @panic("OOM");
     }
     if (!have_timerfd) {
         epoll_shim.installHeader(upstream.path("include/sys/timerfd.h"), "sys/timerfd.h");
-        epoll_shim.root_module.addCSourceFile(.{ .file = upstream.path("src/timerfd.c"), .flags = flags });
-        epoll_shim.root_module.addCSourceFile(.{ .file = upstream.path("src/timerfd_ctx.c"), .flags = flags });
+        sources.append(b.allocator, "timerfd.c") catch @panic("OOM");
+        sources.append(b.allocator, "timerfd_ctx.c") catch @panic("OOM");
     } else {
         epoll_shim.root_module.addCMacro("HAVE_TIMERFD", "");
     }
     if (!have_errno_t) epoll_shim.root_module.addCMacro("errno_t", "int");
+
+    if (!have_sig_set_ops) {
+        compat_sources.append(b.allocator, "sigops") catch @panic("OOM");
+    }
+
+    if (target.result.os.tag.isDarwin()) {
+        compat_sources.append(b.allocator, "pipe2") catch @panic("OOM");
+        compat_sources.append(b.allocator, "socket") catch @panic("OOM");
+        compat_sources.append(b.allocator, "socketpair") catch @panic("OOM");
+        compat_sources.append(b.allocator, "itimerspec") catch @panic("OOM");
+        compat_sources.append(b.allocator, "sem") catch @panic("OOM");
+        compat_sources.append(b.allocator, "ppoll") catch @panic("OOM");
+    }
+
+    var compat_includes: std.Io.Writer.Allocating = .init(b.allocator);
+    for (compat_sources.items) |name| {
+        const upper_name = std.ascii.allocUpperString(b.allocator, name) catch @panic("OOM");
+        epoll_shim.root_module.addCMacro(b.fmt("COMPAT_ENABLE_{s}", .{upper_name}), "");
+        epoll_shim.root_module.addCSourceFile(.{
+            .file = upstream.path(b.fmt("src/compat_{s}.c", .{name})),
+            .flags = flags,
+        });
+        compat_includes.writer.print("#include \"compat_{s}.h\"\n", .{name}) catch @panic("OOM");
+    }
+
+    const compat_includes_written = compat_includes.written();
+    if (compat_includes_written.len == 0) {
+        epoll_shim.root_module.addCSourceFiles(.{
+            .root = upstream.path("src"),
+            .files = sources.items,
+            .flags = flags,
+        });
+    } else {
+        const write_files = b.addWriteFiles();
+        epoll_shim.root_module.addIncludePath(upstream.path("src"));
+        for (sources.items) |src| {
+            const wrapped_src = write_files.add(b.fmt("wrapped_{s}", .{src}), b.fmt("{s}#include \"{s}\"", .{ compat_includes_written, src }));
+            epoll_shim.root_module.addCSourceFile(.{ .file = wrapped_src, .flags = flags });
+        }
+    }
 
     return epoll_shim;
 }

@@ -18,8 +18,8 @@
             .lazy = true,
         },
         .libxml2 = .{
-            .url = "git+https://github.com/allyourcodebase/libxml2.git?ref=2.15.1-2#2528fad1bf17a0a70999930cfd9280554f547787",
-            .hash = "libxml2-2.15.1-2-qHdjhmNMAAAiZOWqVridicq2oMf5NHv0n9W41bz9FtMM",
+            .url = "git+https://github.com/allyourcodebase/libxml2.git?ref=2.15.3#0edd5ae7ebb4a638cccbfc5e74097a5ce66982b7",
+            .hash = "libxml2-2.15.3-qHdjhsNYAAAiL37il-_rW8h72n0EDUeJAZaAV0VV6wQa",
             .lazy = true,
         },
         .@"epoll-shim" = .{
