@@ -532,12 +532,19 @@ fn createEpollShim(
         "epoll-shim/detail/poll.h",
         "epoll-shim/detail/read.h",
         "epoll-shim/detail/write.h",
-        "sys/epoll.h",
         "sys/signalfd.h",
     }) |path| {
         const config_header = b.addConfigHeader(.{
             .include_path = path,
             .style = .{ .cmake = upstream.path("include").path(b, path) },
+        }, .{});
+        epoll_shim.installConfigHeader(config_header);
+        epoll_shim.root_module.addConfigHeader(config_header);
+    }
+    {
+        const config_header = b.addConfigHeader(.{
+            .include_path = "sys/epoll.h",
+            .style = .{ .cmake = upstream.path("include").path(b, "sys/epoll.h") },
         }, .{
             .POLLRDHUP_VALUE = @as(i64, if (target.result.isFreeBSDLibC()) 0x4000 else 0x2000),
         });
