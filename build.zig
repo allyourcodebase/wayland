@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const version: std.SemanticVersion = .{ .major = 1, .minor = 24, .patch = 0 };
+const version: std.SemanticVersion = .{ .major = 1, .minor = 26, .patch = 0 };
 
 pub fn build(b: *std.Build) void {
     const upstream = b.dependency("wayland", .{});
